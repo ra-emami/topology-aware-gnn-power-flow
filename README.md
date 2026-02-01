@@ -49,7 +49,7 @@ The model’s predictions can be visually inspected through multiple plots:
 
 Benchmark Test:  
 
-![](images/Benchmark Test.png)
+![](images/BENCHMARKTEST.png)
 
 ```bash
 git clone https://github.com/ra-emami/topology-aware-gnn-power-flow.git
