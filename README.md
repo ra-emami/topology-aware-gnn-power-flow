@@ -29,9 +29,7 @@ Key features:
 ## Installation
 Clone the repository:
 
-```bash
-git clone https://github.com/ra-emami/topology-aware-gnn-power-flow.git
-cd topology-aware-gnn-power-flow
+
 
 ## Results
 
@@ -53,4 +51,6 @@ Benchmark Test:
 
 ![](images/Benchmark Test.png)
 
-
+```bash
+git clone https://github.com/ra-emami/topology-aware-gnn-power-flow.git
+cd topology-aware-gnn-power-flow
