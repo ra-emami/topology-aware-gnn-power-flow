@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+"""Train the supervised GNN surrogate on the base feeder.
+
+Example:
+    python scripts/train.py --samples 5000 --epochs 300
+    python scripts/train.py --quick
+"""
+import argparse
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+import torch
+from torch_geometric.loader import DataLoader
+
+from pignn import (generate_dataset, split_dataset, fit_scalers, standardize,
+                   ProxySolverGNN, train_supervised, evaluate_model)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--samples", type=int, default=5000)
+    ap.add_argument("--epochs", type=int, default=300)
+    ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--out", default="checkpoints/gnn_powerflow.pt")
+    ap.add_argument("--quick", action="store_true", help="tiny run for smoke testing")
+    args = ap.parse_args()
+    if args.quick:
+        args.samples, args.epochs = 400, 20
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Device: {device}")
+
+    dataset = generate_dataset(args.samples, seed=args.seed)
+    train_set, val_set, test_set = split_dataset(dataset, seed=args.seed)
+    scalers = fit_scalers(train_set)
+    print(f"train={len(train_set)} val={len(val_set)} test={len(test_set)}")
+
+    train_loader = DataLoader(standardize(train_set, scalers), batch_size=args.batch, shuffle=True)
+    val_loader = DataLoader(standardize(val_set, scalers), batch_size=args.batch)
+
+    model = ProxySolverGNN().to(device)
+    train_supervised(model, train_loader, val_loader, epochs=args.epochs, lr=args.lr, device=device)
+
+    metrics = evaluate_model(model, test_set, scalers, device)
+    print(f"\nHeld-out test | V R2={metrics['V_r2']:.4f} MAE={metrics['V_mae']:.3f} mV/pu | "
+          f"angle R2={metrics['th_r2']:.4f} MAE={metrics['th_mae']:.4f} deg | "
+          f"|dP|={metrics['dP']:.4f} MW")
+
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    torch.save({"model": model.state_dict(), **scalers}, args.out)
+    print(f"Saved checkpoint -> {args.out}")
+
+
+if __name__ == "__main__":
+    main()

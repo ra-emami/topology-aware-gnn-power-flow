@@ -1,0 +1,8 @@
+numpy<2.1
+pandas==2.2.2
+pandapower
+torch
+torch_geometric
+scikit-learn
+matplotlib
+numba

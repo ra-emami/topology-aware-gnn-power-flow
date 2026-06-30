@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pignn"
+version = "0.1.0"
+description = "Topology-aware, physics-informed GNN surrogate for AC power flow"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy<2.1",
+    "pandas==2.2.2",
+    "pandapower",
+    "torch",
+    "torch_geometric",
+    "scikit-learn",
+    "matplotlib",
+    "numba",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
