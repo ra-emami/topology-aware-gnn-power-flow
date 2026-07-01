@@ -1,0 +1,17 @@
+{
+  "n_scenarios": 500,
+  "iters_flat_mean": 3.262,
+  "iters_warm_mean": 3.0,
+  "iters_saved_mean": 0.262,
+  "iters_saved_pct": 8.03188228080932,
+  "frac_warm_faster": 0.262,
+  "frac_warm_not_worse": 1.0,
+  "t_flat_ms_mean": 22.607480998383835,
+  "t_warm_ms_mean": 19.18018320389092,
+  "wallclock_speedup": 1.1786895233512498,
+  "max_solution_discrepancy_pu": 6.818720921231147e-09,
+  "fails": {
+    "flat": 0,
+    "warm": 0
+  }
+}
