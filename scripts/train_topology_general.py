@@ -11,6 +11,7 @@ Example:
     python scripts/train_topology_general.py --quick
 """
 import argparse
+import json
 import os
 import sys
 
@@ -36,6 +37,8 @@ def main():
     ap.add_argument("--out", default="checkpoints/gnn_topogeneral.pt")
     ap.add_argument("--single", default="checkpoints/gnn_powerflow.pt",
                     help="single-topology checkpoint to contrast against (optional)")
+    ap.add_argument("--metrics", default="results/topology_general.json",
+                    help="where to save the seen/held-out generalization metrics")
     ap.add_argument("--quick", action="store_true")
     args = ap.parse_args()
     if args.quick:
@@ -78,6 +81,7 @@ def main():
     print(f"  HELD-OUT topologies: mean voltage MAE = {np.mean(list(unseen.values())):.3f} mV/pu")
 
     # Contrast: how does a single-topology model do on the same held-out configs?
+    unseen_single = None
     if os.path.exists(args.single):
         sc_ck = torch.load(args.single, map_location=device)
         sc_scalers = {k: sc_ck[k] for k in ("x_mean", "x_std", "y_mean", "y_std")}
@@ -92,6 +96,24 @@ def main():
     else:
         print(f"\n(No single-topology checkpoint at {args.single} to contrast against — "
               "run scripts/train.py first.)")
+
+    # Persist the generalization metrics for figures and the report.
+    payload = dict(
+        config=dict(samples=args.samples, epochs=args.epochs, seed=args.seed,
+                    holdout=args.holdout, n_seen_cfgs=len(train_cfgs),
+                    n_held_out_cfgs=len(test_cfgs), quick=args.quick),
+        topogeneral=dict(
+            seen_mae=float(np.mean(list(seen.values()))),
+            unseen_mae=float(np.mean(list(unseen.values()))),
+            seen_per_config=seen, unseen_per_config=unseen),
+        single_topology=(dict(
+            unseen_mae=float(np.mean(list(unseen_single.values()))),
+            unseen_per_config=unseen_single) if unseen_single is not None else None),
+    )
+    os.makedirs(os.path.dirname(args.metrics), exist_ok=True)
+    with open(args.metrics, "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"Saved metrics -> {args.metrics}")
 
 
 if __name__ == "__main__":

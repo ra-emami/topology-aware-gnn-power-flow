@@ -7,6 +7,7 @@ Example:
     python scripts/finetune_physics.py --ckpt checkpoints/gnn_powerflow.pt --lam 10
 """
 import argparse
+import json
 import os
 import sys
 
@@ -28,6 +29,8 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--samples", type=int, default=2000)
     ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--metrics", default="results/physics_finetune.json",
+                    help="where to save the before/after metrics and loss curves")
     ap.add_argument("--quick", action="store_true")
     args = ap.parse_args()
     if args.quick:
@@ -52,8 +55,8 @@ def main():
 
     import copy
     model_pinn = copy.deepcopy(model).to(device)
-    finetune_physics(model_pinn, train_loader, residual, lam=args.lam,
-                     epochs=args.epochs, lr=args.lr, device=device)
+    history = finetune_physics(model_pinn, train_loader, residual, lam=args.lam,
+                               epochs=args.epochs, lr=args.lr, device=device)
     after = evaluate_model(model_pinn, eval_set, scalers, device)
 
     print(f"\n{'metric':<22}{'before':>12}{'after':>12}")
@@ -65,6 +68,24 @@ def main():
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     torch.save({"model": model_pinn.state_dict(), **scalers, "lambda_phys": args.lam}, args.out)
     print(f"\nSaved physics-informed checkpoint -> {args.out}")
+
+    # Persist before/after metrics and the fine-tuning loss curves.
+    scalar_keys = ("V_r2", "V_mae", "V_max", "th_r2", "th_mae", "dP", "dQ")
+    payload = dict(
+        config=dict(lam=args.lam, epochs=args.epochs, lr=args.lr,
+                    samples=args.samples, quick=args.quick),
+        before={k: float(before[k]) for k in scalar_keys},
+        after={k: float(after[k]) for k in scalar_keys},
+        before_perbus_mae_mv=before["perbus"].tolist(),
+        after_perbus_mae_mv=after["perbus"].tolist(),
+        before_dP_list=before["resid_list"].tolist(),
+        after_dP_list=after["resid_list"].tolist(),
+        history=dict(sup=history["sup"], phys=history["phys"]),
+    )
+    os.makedirs(os.path.dirname(args.metrics), exist_ok=True)
+    with open(args.metrics, "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"Saved metrics -> {args.metrics}")
 
 
 if __name__ == "__main__":

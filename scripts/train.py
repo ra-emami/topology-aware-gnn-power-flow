@@ -6,6 +6,7 @@ Example:
     python scripts/train.py --quick
 """
 import argparse
+import json
 import os
 import sys
 
@@ -26,6 +27,8 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="checkpoints/gnn_powerflow.pt")
+    ap.add_argument("--metrics", default="results/supervised.json",
+                    help="where to save the training curve + held-out metrics")
     ap.add_argument("--quick", action="store_true", help="tiny run for smoke testing")
     args = ap.parse_args()
     if args.quick:
@@ -43,7 +46,8 @@ def main():
     val_loader = DataLoader(standardize(val_set, scalers), batch_size=args.batch)
 
     model = ProxySolverGNN().to(device)
-    train_supervised(model, train_loader, val_loader, epochs=args.epochs, lr=args.lr, device=device)
+    history = train_supervised(model, train_loader, val_loader,
+                               epochs=args.epochs, lr=args.lr, device=device)
 
     metrics = evaluate_model(model, test_set, scalers, device)
     print(f"\nHeld-out test | V R2={metrics['V_r2']:.4f} MAE={metrics['V_mae']:.3f} mV/pu | "
@@ -53,6 +57,21 @@ def main():
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     torch.save({"model": model.state_dict(), **scalers}, args.out)
     print(f"Saved checkpoint -> {args.out}")
+
+    # Persist the training curve and held-out metrics for figures and the report.
+    scalar_keys = ("V_r2", "V_mae", "V_max", "th_r2", "th_mae", "dP", "dQ")
+    payload = dict(
+        config=dict(samples=args.samples, epochs=args.epochs, batch=args.batch,
+                    lr=args.lr, seed=args.seed, quick=args.quick),
+        history=dict(train=history["train"], val=history["val"],
+                     best_val=history["best_val"]),
+        test={k: float(metrics[k]) for k in scalar_keys},
+        test_perbus_mae_mv=metrics["perbus"].tolist(),
+    )
+    os.makedirs(os.path.dirname(args.metrics), exist_ok=True)
+    with open(args.metrics, "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"Saved metrics -> {args.metrics}")
 
 
 if __name__ == "__main__":
