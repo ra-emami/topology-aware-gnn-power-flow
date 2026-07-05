@@ -113,10 +113,17 @@ topology-aware-pignn/
 │   ├── train.py        # supervised training + physics-informed fine-tuning
 │   └── evaluate.py     # metrics, baselines, undervoltage, topology generalization
 ├── scripts/
-│   ├── train.py                   # supervised training -> checkpoints/gnn_powerflow.pt
-│   ├── finetune_physics.py        # physics-informed fine-tuning -> ..._pinn.pt
-│   ├── evaluate.py                # baselines + physics + topology generalization report
-│   └── train_topology_general.py  # train across reconfigurations, test on held-out topologies
+│   ├── train.py                        # supervised training -> checkpoints/gnn_powerflow.pt
+│   ├── finetune_physics.py             # physics-informed fine-tuning -> ..._pinn.pt
+│   ├── evaluate.py                     # baselines + physics + topology generalization report
+│   ├── train_topology_general.py       # train across reconfigurations, test on held-out topologies
+│   ├── ablate_k.py                     # TAGConv hop-count K / edge-weight ablation
+│   ├── ablate_edgeweights_topology.py  # edge weights vs topology generalization (multi-seed)
+│   ├── warmstart_nr.py                 # GNN warm-start for Newton-Raphson
+│   └── make_figures.py                 # render all figures from results/ + checkpoints
+├── tests/                              # pytest: topology, physics residual, LinDistFlow
+├── notebooks/reproduce_on_colab.ipynb  # regenerate everything on Colab
+├── REPORT.md                           # technical report
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
@@ -148,8 +155,9 @@ python scripts/evaluate.py --ckpt checkpoints/gnn_powerflow_pinn.pt
 python scripts/train_topology_general.py --samples 6000 --epochs 200
 
 # 5) Ablations: TAGConv hop count K, and impedance edge weights across topologies
+#    (the edge-weight ablation aggregates mean +/- std over several seeds)
 python scripts/ablate_k.py --ks 1 2 3 4
-python scripts/ablate_edgeweights_topology.py --samples 6000 --epochs 200
+python scripts/ablate_edgeweights_topology.py --samples 6000 --epochs 200 --seeds 42 43 44
 
 # 6) GNN warm-start for Newton-Raphson (solver acceleration)
 python scripts/warmstart_nr.py --n 500

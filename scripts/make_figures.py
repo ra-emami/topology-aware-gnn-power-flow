@@ -115,15 +115,22 @@ def fig_ablation_edgeweights_topology():
     groups = ["seen topologies", "held-out topologies"]
     on_vals = [on["seen_mae"], on["unseen_mae"]]
     off_vals = [off["seen_mae"], off["unseen_mae"]]
+    # Multi-seed results carry std across seeds; single-seed results have none.
+    on_err = [on.get("seen_std", 0), on.get("unseen_std", 0)]
+    off_err = [off.get("seen_std", 0), off.get("unseen_std", 0)]
+    n_seeds = len(d.get("per_seed", [])) or 1
     x = np.arange(len(groups)); w = 0.35
     fig, ax = plt.subplots(figsize=(6, 4))
-    b1 = ax.bar(x - w / 2, on_vals, w, label="edge weights on")
-    b2 = ax.bar(x + w / 2, off_vals, w, label="edge weights off")
+    b1 = ax.bar(x - w / 2, on_vals, w, yerr=on_err, capsize=4, label="edge weights on")
+    b2 = ax.bar(x + w / 2, off_vals, w, yerr=off_err, capsize=4, label="edge weights off")
     ax.bar_label(b1, fmt="%.1f", padding=2, fontsize=8)
     ax.bar_label(b2, fmt="%.1f", padding=2, fontsize=8)
     ax.set_xticks(x); ax.set_xticklabels(groups)
     ax.set_ylabel("mean voltage MAE (mV/pu)")
-    ax.set_title("Phase 1: edge weights aid topology generalization")
+    title = "Edge weights and topology generalization"
+    if n_seeds > 1:
+        title += f" (mean ± std, {n_seeds} seeds)"
+    ax.set_title(title)
     ax.legend(); ax.grid(alpha=0.3, axis="y")
     _save(fig, "ablation_edgeweights_topology.png")
 

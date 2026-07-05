@@ -219,8 +219,9 @@ python scripts/ablate_k.py --ks 1 2 3 4
 # Topology-general training  -> checkpoints/gnn_topogeneral.pt, results/topology_general.json
 python scripts/train_topology_general.py --samples 6000 --epochs 200
 
-# Phase 1 edge-weight topology ablation  -> results/ablation_edgeweights_topology.json
-python scripts/ablate_edgeweights_topology.py --samples 6000 --epochs 200
+# Phase 1 edge-weight topology ablation (mean +/- std over seeds)
+#   -> results/ablation_edgeweights_topology.json
+python scripts/ablate_edgeweights_topology.py --samples 6000 --epochs 200 --seeds 42 43 44
 
 # Phase 2 NR warm-start  -> results/warmstart_nr.json, results/warmstart_nr_per_scenario.csv
 python scripts/warmstart_nr.py --n 500

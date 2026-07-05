@@ -16,9 +16,13 @@ from .data import _node_flags, _solve_scenario
 
 @torch.no_grad()
 def predict(model, raw, scalers, device):
-    """Run the model on a raw (unstandardized) Data; return (V_pu, theta_rad)."""
+    """Run the model on a raw (unstandardized) Data; return (V_pu, theta_rad).
+
+    Scaler tensors may live on any device (e.g. loaded from a CUDA checkpoint);
+    all arithmetic happens on the graph tensors' device.
+    """
     x = raw.x.clone()
-    x[:, :2] = (x[:, :2] - scalers["x_mean"]) / scalers["x_std"]
+    x[:, :2] = (x[:, :2] - scalers["x_mean"].to(x.device)) / scalers["x_std"].to(x.device)
     d = Data(x=x, edge_index=raw.edge_index, edge_weight=raw.edge_weight).to(device)
     model.eval()
     out = (model(d) * scalers["y_std"].to(device) + scalers["y_mean"].to(device)).cpu().numpy()

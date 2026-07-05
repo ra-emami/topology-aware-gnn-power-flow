@@ -112,11 +112,17 @@ def fit_scalers(train_set):
 
 
 def standardize(ds, sc):
-    """Apply scalers to a dataset (injections standardized; flags untouched)."""
+    """Apply scalers to a dataset (injections standardized; flags untouched).
+
+    Scaler tensors may live on any device (e.g. loaded from a CUDA checkpoint);
+    statistics are brought to the dataset tensors' device before use.
+    """
     out = []
     for d in ds:
+        xm, xs = sc["x_mean"].to(d.x.device), sc["x_std"].to(d.x.device)
+        ym, ys = sc["y_mean"].to(d.y.device), sc["y_std"].to(d.y.device)
         x = d.x.clone()
-        x[:, :2] = (x[:, :2] - sc["x_mean"]) / sc["x_std"]
+        x[:, :2] = (x[:, :2] - xm) / xs
         out.append(Data(x=x, edge_index=d.edge_index, edge_weight=d.edge_weight,
-                        y=(d.y - sc["y_mean"]) / sc["y_std"]))
+                        y=(d.y - ym) / ys))
     return out
