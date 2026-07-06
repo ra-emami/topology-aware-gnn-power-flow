@@ -93,17 +93,34 @@ accelerator; headroom is modest on a small, well-conditioned feeder (NR needs on
 ~3.3 iterations from flat) and would grow on larger, stiffer systems and at tighter
 tolerances.
 
+### Second feeder and cross-feeder transfer (Phase 4)
+
+![Cross-feeder evaluation](figures/crossfeeder.png)
+
+The package is parametric over the network: `--network case69` runs the same
+pipeline on the **IEEE 69-bus feeder** (built from the published Baran & Wu data
+and validated against its published load-flow solution by the test suite). Trained
+natively, the surrogate reaches **V R²=0.977, MAE 1.84 mV/pu** on the 69-bus
+system — the approach ports with a one-flag change. **Zero-shot transfer between
+feeders fails in both directions**, however (33→69: 18.8 mV/pu; 69→33: 46.2 mV/pu;
+both R²<0): the architecture is size-agnostic, but per-feeder z-score normalization
+makes the learned mapping feeder-specific. A clean negative result that pinpoints
+the obstacle — feeder-invariant normalization or joint multi-feeder training is the
+natural next step.
+
 ### Limitations
 
-Results are on a single 33-bus feeder; the edge-weight ablation spans three seeds,
+The 33-bus feeder carries the full experiment suite; the 69-bus feeder carries
+native training and the transfer test. The edge-weight ablation spans three seeds,
 the other experiments one. Absolute margins for edge-weight generalization (~2.9%
 held-out MAE, gap reduction consistent across seeds) and warm-start (~8%) are
-modest. LinDistFlow is a strong baseline on one radial feeder, so the GNN's value is
+modest, and zero-shot cross-feeder transfer does not work under per-feeder scalers.
+LinDistFlow is a strong baseline on one radial feeder, so the GNN's value is
 differentiability, physics-consistency, and cross-topology transfer. NR data
 generation is CPU-bound (pandapower), so scaling is limited by scenario generation
-rather than GPU. Planned next steps: a 69-bus feeder with cross-feeder transfer,
-multi-seed error bars for the remaining experiments, and a differentiable NR
-correction layer for hard feasibility.
+rather than GPU. Planned next steps: feeder-invariant normalization for viable
+cross-feeder transfer, multi-seed error bars for the remaining experiments, and a
+differentiable NR correction layer for hard feasibility.
 
 ## Repository structure
 
@@ -116,7 +133,8 @@ topology-aware-pignn/
 │   ├── model.py        # ProxySolverGNN (TAGConv)
 │   ├── physics.py      # admittance matrix + differentiable power-balance residual
 │   ├── train.py        # supervised training + physics-informed fine-tuning
-│   └── evaluate.py     # metrics, baselines, undervoltage, topology generalization
+│   ├── evaluate.py     # metrics, baselines, undervoltage, topology generalization
+│   └── case69.py       # IEEE 69-bus feeder (Baran & Wu) built from published data
 ├── scripts/
 │   ├── train.py                        # supervised training -> checkpoints/gnn_powerflow.pt
 │   ├── finetune_physics.py             # physics-informed fine-tuning -> ..._pinn.pt
@@ -125,6 +143,7 @@ topology-aware-pignn/
 │   ├── ablate_k.py                     # TAGConv hop-count K / edge-weight ablation
 │   ├── ablate_edgeweights_topology.py  # edge weights vs topology generalization (multi-seed)
 │   ├── warmstart_nr.py                 # GNN warm-start for Newton-Raphson
+│   ├── crossfeeder.py                  # native vs zero-shot vs LinDistFlow across feeders
 │   └── make_figures.py                 # render all figures from results/ + checkpoints
 ├── tests/                              # pytest: topology, physics residual, LinDistFlow
 ├── notebooks/reproduce_on_colab.ipynb  # regenerate everything on Colab
@@ -195,12 +214,14 @@ GPU, see [notebooks/reproduce_on_colab.ipynb](notebooks/reproduce_on_colab.ipynb
 
 ## Roadmap
 
-- **Ablations.** Sweep the TAGConv hop count `K` and toggle the impedance edge
-  weights to quantify the contribution of multi-hop, impedance-aware propagation.
-- **Additional feeders.** Extend to the 69-bus system and cross-feeder transfer.
-- **Hard feasibility.** Replace the soft penalty with a differentiable
-  Newton–Raphson correction layer, or use the surrogate to warm-start NR and
-  measure iteration savings.
+- **Feeder-invariant normalization.** Replace per-feeder z-score scalers with
+  physical per-unit scaling (or train jointly across feeders) so the surrogate
+  transfers zero-shot between systems — the obstacle the cross-feeder experiment
+  isolates.
+- **Multi-seed error bars everywhere.** The edge-weight ablation aggregates three
+  seeds; extend the same treatment to the remaining experiments.
+- **Hard feasibility.** Replace the soft power-balance penalty with a
+  differentiable Newton–Raphson correction layer or a feasibility projection.
 
 ## Stack
 

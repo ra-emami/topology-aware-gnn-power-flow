@@ -168,11 +168,50 @@ scale-free metric to read.
 
 ![](figures/warmstart_nr.png)
 
+### Phase 4: a second feeder and cross-feeder transfer
+
+The package is parametric over the network: the same pipeline runs on the IEEE 69-bus
+feeder (constructed from the published Baran & Wu data, since pandapower does not ship
+it, and validated against the published load-flow solution — V_min 0.9094 pu at bus 65,
+~225 kW losses — by the test suite). Trained natively (5000 scenarios, 300 epochs), the
+surrogate reaches voltage R2 = 0.977 and MAE = 1.84 mV/pu on the 69-bus system: the
+approach ports to a second feeder with a one-flag change.
+
+Cross-feeder **zero-shot transfer**, however, fails in both directions. Evaluated on 500
+fresh scenarios per target feeder (voltage MAE, mV/pu):
+
+| Target feeder | Native model | Zero-shot from the other feeder | LinDistFlow |
+|---|---:|---:|---:|
+| 33-bus | 2.55 | 46.25 (R2 < 0) | 1.45 |
+| 69-bus | 1.81 | 18.85 (R2 < 0) | 0.94 |
+
+The architecture is size-agnostic — the same weights run on any graph — but the learned
+mapping is not feeder-invariant: inputs and outputs are standardized with per-feeder
+z-score statistics, and the two systems differ sharply in per-bus injection scale (the
+69-bus feeder concentrates a third of its load at one bus) and voltage-profile statistics.
+Under that distribution shift the transferred model is worse than the trivial baselines.
+This is reported as a clean negative result: within-feeder topology generalization works
+(the reconfiguration experiments above), but cross-feeder transfer requires
+feeder-invariant normalization (physical per-unit scaling rather than dataset z-scores)
+or joint multi-feeder training — the natural next step this measurement motivates.
+
+A further observation: the 69-bus power residual (|dP| = 4.6 MW for the native model) is
+not comparable to the 33-bus scale (0.26 MW). The 69-bus feeder's head branches are
+nearly zero-impedance (R = 0.0005 ohm, about 3e-5 pu), so the admittance matrix magnifies
+millivolt-scale voltage errors into large apparent power mismatches. Residual-based
+comparisons are therefore only meaningful within one feeder.
+
+![](figures/crossfeeder.png)
+
 ## Honest findings and limitations
 
-- **Single feeder, few seeds.** All results are on the 33-bus feeder; the edge-weight
-  ablation spans three seeds, the remaining experiments one. Multi-seed error bars for
-  every experiment are needed before treating small margins as settled.
+- **Two feeders, few seeds.** The 33-bus system carries the full experiment suite; the
+  69-bus system carries native training and the transfer test. The edge-weight ablation
+  spans three seeds, the remaining experiments one. Multi-seed error bars for every
+  experiment are needed before treating small margins as settled.
+- **Zero-shot cross-feeder transfer does not work.** Per-feeder z-score normalization
+  makes the learned mapping feeder-specific; transferred models score worse than trivial
+  baselines. The measurement pinpoints the obstacle (normalization, not architecture).
 - **Modest margins where it matters most.** The edge-weight held-out benefit (~2.9%,
   within run-to-run noise; the gap reduction is the seed-consistent effect) and the
   warm-start iteration saving (~8%) are real but small; they are reported as directional
@@ -185,9 +224,10 @@ scale-free metric to read.
 - **Soft physics constraint.** The power-balance residual is a penalty, not a hard feasibility
   guarantee; predictions are consistent, not exactly feasible.
 
-Future work: extend to the 69-bus feeder and cross-feeder transfer; add multi-seed error
-bars; and replace the soft penalty with a differentiable NR correction layer or a
-hard-feasibility projection.
+Future work: feeder-invariant normalization or joint multi-feeder training to make
+cross-feeder transfer viable; multi-seed error bars for all experiments; and replacing
+the soft penalty with a differentiable NR correction layer or a hard-feasibility
+projection.
 
 ## Reproducibility
 
@@ -232,13 +272,19 @@ python scripts/ablate_edgeweights_topology.py --samples 6000 --epochs 200 --seed
 # Phase 2 NR warm-start  -> results/warmstart_nr.json, results/warmstart_nr_per_scenario.csv
 python scripts/warmstart_nr.py --n 500
 
+# Phase 4: IEEE 69-bus feeder and cross-feeder transfer
+#   -> checkpoints/gnn_powerflow_case69.pt, results/supervised_case69.json,
+#      results/crossfeeder.json
+python scripts/train.py --network case69 --samples 5000 --epochs 300
+python scripts/crossfeeder.py --samples 500
+
 # All figures  -> figures/*.png  (reads results/ and checkpoints/)
 python scripts/make_figures.py
 ```
 
 Figures: `training_curve.png`, `parity.png`, `baseline_comparison.png`,
 `physics_before_after.png`, `ablation_k.png`, `ablation_edgeweights_topology.png`,
-`warmstart_nr.png` (all under `figures/`).
+`warmstart_nr.png`, `crossfeeder.png` (all under `figures/`).
 
 Repository: https://github.com/ra-emami/topology-aware-gnn-power-flow
 
