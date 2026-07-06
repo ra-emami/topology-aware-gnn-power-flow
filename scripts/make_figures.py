@@ -135,6 +135,30 @@ def fig_ablation_edgeweights_topology():
     _save(fig, "ablation_edgeweights_topology.png")
 
 
+def fig_crossfeeder():
+    d = _load_json("crossfeeder.json")
+    if not d:
+        print("  [skip] crossfeeder: results/crossfeeder.json not found")
+        return
+    targets = [t for t in ("case33bw", "case69") if t in d["results"]]
+    series = [("case33bw", "33-bus model"), ("case69", "69-bus model"),
+              ("lindistflow", "LinDistFlow")]
+    x = np.arange(len(targets)); w = 0.25
+    fig, ax = plt.subplots(figsize=(7, 4))
+    for i, (key, label) in enumerate(series):
+        vals = [d["results"][t][key]["V_mae"] if key in d["results"][t] else np.nan
+                for t in targets]
+        b = ax.bar(x + (i - 1) * w, vals, w, label=label)
+        ax.bar_label(b, fmt="%.1f", padding=2, fontsize=8)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"target: {t}" for t in targets])
+    ax.set_ylabel("voltage MAE (mV/pu)")
+    ax.set_yscale("log")
+    ax.set_title("Cross-feeder evaluation: native vs zero-shot vs linear baseline")
+    ax.legend(); ax.grid(alpha=0.3, axis="y")
+    _save(fig, "crossfeeder.png")
+
+
 def fig_warmstart():
     d = _load_json("warmstart_nr.json")
     csv_path = os.path.join(RESULTS, "warmstart_nr_per_scenario.csv")
@@ -263,6 +287,7 @@ def main():
     fig_ablation_k()
     fig_ablation_edgeweights_topology()
     fig_warmstart()
+    fig_crossfeeder()
 
     # Model-driven figures: build one evaluation set and reuse it.
     model, scalers = _load_model(args.ckpt, device)

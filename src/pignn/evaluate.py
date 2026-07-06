@@ -7,7 +7,7 @@ import torch
 from torch_geometric.data import Data
 from sklearn.metrics import r2_score
 
-from .config import DER_BUSES
+from .config import DEFAULT_NETWORK, der_buses_for
 from .topology import (base_case, build_topology, apply_config,
                        lindistflow_matrices, lindistflow_predict)
 from .physics import build_ybus
@@ -94,18 +94,20 @@ def undervoltage_screening(model, test_set, scalers, device, thr=0.95):
                 TP=TP, FP=FP, FN=FN, TN=TN)
 
 
-def evaluate_on_topologies(model, configs, scalers, device, n=80, seed=0):
+def evaluate_on_topologies(model, configs, scalers, device, n=80, seed=0,
+                           network=DEFAULT_NETWORK):
     """Mean voltage MAE (mV/pu) of the model on each topology configuration."""
-    base = base_case()
+    der_buses = der_buses_for(network)
+    base = base_case(network)
     rng = np.random.default_rng(seed)
     results = {}
     for cfg in configs:
         net = apply_config(base, cfg)
         ei, ew = build_topology(net)
-        is_slack, is_der = _node_flags(net)
+        is_slack, is_der = _node_flags(net, der_buses)
         errs = []
         for _ in range(n):
-            d = _solve_scenario(net, ei, ew, is_der, is_slack, rng)
+            d = _solve_scenario(net, ei, ew, is_der, is_slack, rng, der_buses)
             if d is None:
                 continue
             gv, _ = predict(model, d, scalers, device)

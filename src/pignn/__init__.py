@@ -2,7 +2,7 @@
 
 __version__ = "0.1.0"
 
-from .config import DER_BUSES, SEED
+from .config import DER_BUSES, SEED, NETWORKS, DEFAULT_NETWORK, der_buses_for
 from .topology import (
     base_case,
     build_topology,
@@ -31,7 +31,8 @@ from .evaluate import (
 )
 
 __all__ = [
-    "DER_BUSES", "SEED", "base_case", "build_topology", "enumerate_radial_configs",
+    "DER_BUSES", "SEED", "NETWORKS", "DEFAULT_NETWORK", "der_buses_for",
+    "base_case", "build_topology", "enumerate_radial_configs",
     "apply_config", "tie_lines", "lindistflow_matrices", "lindistflow_predict",
     "generate_dataset", "generate_multitopology_dataset", "split_dataset",
     "fit_scalers", "standardize", "ProxySolverGNN", "build_ybus",

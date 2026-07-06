@@ -167,7 +167,11 @@ python scripts/ablate_edgeweights_topology.py --samples 6000 --epochs 200 --seed
 # 6) GNN warm-start for Newton-Raphson (solver acceleration)
 python scripts/warmstart_nr.py --n 500
 
-# 7) Render every figure from results/ + checkpoints into figures/
+# 7) IEEE 69-bus feeder (Baran & Wu) and cross-feeder transfer
+python scripts/train.py --network case69 --samples 5000 --epochs 300
+python scripts/crossfeeder.py --samples 500
+
+# 8) Render every figure from results/ + checkpoints into figures/
 python scripts/make_figures.py
 ```
 

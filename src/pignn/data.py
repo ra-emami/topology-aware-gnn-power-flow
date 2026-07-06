@@ -13,27 +13,33 @@ import pandapower as pp
 from pandapower.powerflow import LoadflowNotConverged
 from torch_geometric.data import Data
 
-from .config import DER_BUSES, LOAD_SCALE_RANGE, DER_P_RANGE, DER_Q_RANGE
+from .config import (DEFAULT_NETWORK, LOAD_SCALE_RANGE, DER_P_RANGE, DER_Q_RANGE,
+                     der_buses_for)
 from .topology import base_case, build_topology, apply_config
 
 
-def _node_flags(net):
+def _node_flags(net, der_buses=None):
+    if der_buses is None:
+        der_buses = der_buses_for()
     slack = int(net.ext_grid.bus.values[0])
     is_slack = torch.zeros(len(net.bus)); is_slack[slack] = 1.0
-    is_der = torch.zeros(len(net.bus)); is_der[DER_BUSES] = 1.0
+    is_der = torch.zeros(len(net.bus)); is_der[der_buses] = 1.0
     return is_slack, is_der
 
 
-def _solve_scenario(net_template, edge_index, edge_weight, is_der, is_slack, rng):
+def _solve_scenario(net_template, edge_index, edge_weight, is_der, is_slack, rng,
+                    der_buses=None):
     """Sample one operating point on a fixed topology and solve it. Returns Data or None."""
+    if der_buses is None:
+        der_buses = der_buses_for()
     net = copy.deepcopy(net_template)
     scale = rng.uniform(*LOAD_SCALE_RANGE)
     net.load.p_mw *= scale
     net.load.q_mvar *= scale
 
-    p_disp = rng.uniform(*DER_P_RANGE, len(DER_BUSES))
-    q_disp = rng.uniform(*DER_Q_RANGE, len(DER_BUSES))
-    for i, bus in enumerate(DER_BUSES):
+    p_disp = rng.uniform(*DER_P_RANGE, len(der_buses))
+    q_disp = rng.uniform(*DER_Q_RANGE, len(der_buses))
+    for i, bus in enumerate(der_buses):
         pp.create_sgen(net, bus, p_mw=p_disp[i], q_mvar=q_disp[i])
 
     try:
@@ -44,8 +50,8 @@ def _solve_scenario(net_template, edge_index, edge_weight, is_der, is_slack, rng
     p = np.zeros(len(net.bus)); q = np.zeros(len(net.bus))
     p[net.load.bus.values] -= net.load.p_mw.values
     q[net.load.bus.values] -= net.load.q_mvar.values
-    p[DER_BUSES] += p_disp
-    q[DER_BUSES] += q_disp
+    p[der_buses] += p_disp
+    q[der_buses] += q_disp
 
     x = torch.stack([torch.tensor(p, dtype=torch.float),
                      torch.tensor(q, dtype=torch.float), is_der, is_slack], dim=1)
@@ -55,15 +61,17 @@ def _solve_scenario(net_template, edge_index, edge_weight, is_der, is_slack, rng
                 y=torch.stack([v, th], dim=1))
 
 
-def generate_dataset(n_samples, config=None, seed=0, verbose=True):
-    """Generate scenarios on a single topology (the base feeder or a reconfiguration)."""
-    net = apply_config(base_case(), config)
+def generate_dataset(n_samples, config=None, seed=0, verbose=True,
+                     network=DEFAULT_NETWORK):
+    """Generate scenarios on a single topology (a base feeder or a reconfiguration)."""
+    der_buses = der_buses_for(network)
+    net = apply_config(base_case(network), config)
     ei, ew = build_topology(net)
-    is_slack, is_der = _node_flags(net)
+    is_slack, is_der = _node_flags(net, der_buses)
     rng = np.random.default_rng(seed)
     out, fail = [], 0
     for _ in range(n_samples):
-        d = _solve_scenario(net, ei, ew, is_der, is_slack, rng)
+        d = _solve_scenario(net, ei, ew, is_der, is_slack, rng, der_buses)
         (out.append(d) if d is not None else None)
         fail += d is None
     if verbose:
@@ -71,20 +79,22 @@ def generate_dataset(n_samples, config=None, seed=0, verbose=True):
     return out
 
 
-def generate_multitopology_dataset(n_samples, configs, seed=0, verbose=True):
+def generate_multitopology_dataset(n_samples, configs, seed=0, verbose=True,
+                                   network=DEFAULT_NETWORK):
     """Generate scenarios spread across several topologies (one random config each)."""
-    base = base_case()
+    der_buses = der_buses_for(network)
+    base = base_case(network)
     rng = np.random.default_rng(seed)
     prep = []
     for cfg in configs:
         net = apply_config(base, cfg)
         ei, ew = build_topology(net)
-        is_slack, is_der = _node_flags(net)
+        is_slack, is_der = _node_flags(net, der_buses)
         prep.append((net, ei, ew, is_der, is_slack))
     out, fail = [], 0
     for _ in range(n_samples):
         net, ei, ew, is_der, is_slack = prep[rng.integers(len(prep))]
-        d = _solve_scenario(net, ei, ew, is_der, is_slack, rng)
+        d = _solve_scenario(net, ei, ew, is_der, is_slack, rng, der_buses)
         (out.append(d) if d is not None else None)
         fail += d is None
     if verbose:

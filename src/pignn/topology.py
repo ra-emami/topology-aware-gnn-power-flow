@@ -13,9 +13,18 @@ import pandapower as pp
 import pandapower.networks as nw
 
 
-def base_case():
-    """Return a fresh IEEE 33-bus distribution feeder."""
-    return nw.case33bw()
+def base_case(network="case33bw"):
+    """Return a fresh distribution feeder by name.
+
+    ``case33bw`` comes from pandapower; ``case69`` is the IEEE 69-bus feeder
+    constructed from the published Baran & Wu data (see :mod:`pignn.case69`).
+    """
+    if network == "case33bw":
+        return nw.case33bw()
+    if network == "case69":
+        from .case69 import case69
+        return case69()
+    raise ValueError(f"unknown network '{network}' (choose 'case33bw' or 'case69')")
 
 
 def build_topology(net):
