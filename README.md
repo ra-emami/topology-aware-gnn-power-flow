@@ -27,16 +27,16 @@ per-experiment discussion, lives in [REPORT.md](REPORT.md).
 
 ![Parity plot](figures/parity.png)
 
-On the held-out test set the supervised model reaches **Voltage R²=0.983**
-(**MAE 2.57 mV/pu**), **Angle R²=0.931** (**MAE 0.12°**), with an AC active-power
-residual of **|dP|=0.261 MW**. The parity plot shows predictions tracking the
+On the held-out test set the supervised model reaches **Voltage R²=0.984**
+(**MAE 2.55 mV/pu**), **Angle R²=0.931** (**MAE 0.12°**), with an AC active-power
+residual of **|dP|=0.260 MW**. The parity plot shows predictions tracking the
 Newton–Raphson (NR) ground truth across the full voltage range.
 
 ![Physics before/after](figures/physics_before_after.png)
 
 Physics-informed fine-tuning (λ=10) roughly **halves the AC power-balance
-violation** at negligible accuracy cost: **|dP| 0.254 → 0.107 MW (~58% lower)** and
-**|dQ| 0.235 → 0.110 MVAr (~53% lower)**, while Voltage R² holds at ~0.983. The
+violation** at negligible accuracy cost: **|dP| 0.252 → 0.125 MW (~50% lower)** and
+**|dQ| 0.216 → 0.118 MVAr (~46% lower)**, while Voltage R² holds at ~0.984. The
 model trades a fraction of a millivolt of fit for markedly more physically
 consistent predictions.
 
@@ -55,11 +55,11 @@ raw single-feeder accuracy.
 ![K / edge-weight ablation](figures/ablation_k.png)
 
 On a single fixed topology, the TAGConv hop count **K** dominates accuracy: going
-from K1 to K4 more than halves voltage MAE (**4.52 → 1.98 mV/pu** with edge weights
-on; **4.53 → 1.46 mV/pu** with them off). The best single-topology config is
-**K=4, edge-weights-off (MAE 1.46 mV/pu, R²=0.9916)**. Notably, on a *fixed*
-topology the impedance edge weights are roughly neutral and slightly better off at
-high K — which sets up the topology-general finding below.
+from K1 to K4 more than halves voltage MAE (**4.51 → 1.98 mV/pu** with edge weights
+on; **4.52 → 1.77 mV/pu** with them off). The best single-topology config is
+**K=4, edge-weights-off (MAE 1.77 mV/pu, R²=0.990)**. Notably, on a *fixed*
+topology the impedance edge weights are roughly neutral (the better variant flips
+between K values) — which sets up the topology-general finding below.
 
 ### Topology-general edge weights (Phase 1)
 
@@ -67,24 +67,27 @@ high K — which sets up the topology-general finding below.
 
 Training across **42 seen reconfigurations** and testing on **17 held-out** ones (59
 valid radial configs total) shows the topology-general model transfers to unseen
-topologies (**held-out 18.18 mV/pu** vs **19.88** for a single-topology model on the
-same targets). Holding everything fixed except the edge-weight switch, **impedance
-edge weights improve generalization**: held-out MAE **18.14 vs 18.79 mV/pu (~3.4%
-lower)** and a tighter generalization gap (**+5.68 vs +7.64**), at the cost of
-fitting seen topologies slightly less tightly. This resolves the tension with the
-single-topology ablation — the impedance weighting is an inductive bias whose value
-appears specifically when the **topology changes**, justifying "topology-aware."
-(Caveat: modest ~3.4% margin, single seed.)
+topologies (**held-out 17.8 mV/pu** vs **20.4** for a single-topology model on the
+same targets, ~13% lower). Holding everything fixed except the edge-weight switch,
+across **three seeds** (each re-drawing the holdout split, data, and init), the
+impedance edge weights yield a **smaller generalization gap in 3/3 seeds** (mean
+**7.26 vs 8.47 mV/pu**) and lower held-out MAE in 2/3 (mean **19.18 vs 19.76
+mV/pu, ~2.9%**, within run-to-run noise), while fitting seen topologies slightly
+less tightly. This resolves the tension with the single-topology ablation — the
+impedance weighting is an inductive bias whose value appears specifically when the
+**topology changes**: it consistently curbs overfitting to the seen wiring, which
+is what justifies "topology-aware." The held-out-MAE margin itself is directional
+rather than definitive.
 
 ### NR warm-start (Phase 2)
 
 ![NR warm-start](figures/warmstart_nr.png)
 
 Used to warm-start Newton–Raphson on 500 base-feeder scenarios, the surrogate cuts
-mean NR iterations **3.26 → 3.00 (~8.0% fewer)** and is **never worse than a flat
-start** (100% of scenarios; strictly faster in 26.2%). Both starts converge to an
-identical solution (max |V| discrepancy ~7e-9 pu). Wall-clock improves 22.6 → 19.2
-ms (×1.18), but at 33 buses wall-clock is dominated by pandapower per-call setup, so
+mean NR iterations **3.26 → 2.99 (~8.2% fewer)** and is **never worse than a flat
+start** (100% of scenarios; strictly faster in 26.8%). Both starts converge to an
+identical solution (max |V| discrepancy ~7e-9 pu). Wall-clock improves 12.2 → 11.7
+ms (×1.04), but at 33 buses wall-clock is dominated by pandapower per-call setup, so
 **iteration count is the scale-free metric**. The surrogate is a safe, measurable NR
 accelerator; headroom is modest on a small, well-conditioned feeder (NR needs only
 ~3.3 iterations from flat) and would grow on larger, stiffer systems and at tighter
@@ -92,13 +95,15 @@ tolerances.
 
 ### Limitations
 
-Results are on a single 33-bus feeder and mostly a single seed; absolute margins for
-edge-weight generalization (~3.4%) and warm-start (~8%) are modest. LinDistFlow is a
-strong baseline on one radial feeder, so the GNN's value is differentiability,
-physics-consistency, and cross-topology transfer. NR data generation is CPU-bound
-(pandapower), so scaling is limited by scenario generation rather than GPU. Planned
-next steps: a 69-bus feeder with cross-feeder transfer, multi-seed error bars, and a
-differentiable NR correction layer for hard feasibility.
+Results are on a single 33-bus feeder; the edge-weight ablation spans three seeds,
+the other experiments one. Absolute margins for edge-weight generalization (~2.9%
+held-out MAE, gap reduction consistent across seeds) and warm-start (~8%) are
+modest. LinDistFlow is a strong baseline on one radial feeder, so the GNN's value is
+differentiability, physics-consistency, and cross-topology transfer. NR data
+generation is CPU-bound (pandapower), so scaling is limited by scenario generation
+rather than GPU. Planned next steps: a 69-bus feeder with cross-feeder transfer,
+multi-seed error bars for the remaining experiments, and a differentiable NR
+correction layer for hard feasibility.
 
 ## Repository structure
 

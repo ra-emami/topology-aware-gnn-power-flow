@@ -62,8 +62,8 @@ fine-tuning at `lambda=10`):
 
 | Stage | Voltage R2 | Voltage MAE | Angle R2 | Angle MAE | \|dP\| (MW) | \|dQ\| (MVAr) |
 |---|---:|---:|---:|---:|---:|---:|
-| Supervised | 0.983 | 2.57 mV/pu | 0.931 | 0.12 deg | 0.261 | 0.235 |
-| Physics-informed (lambda=10) | 0.983 | 2.61 mV/pu | 0.927 | — | 0.107 | 0.110 |
+| Supervised | 0.984 | 2.55 mV/pu | 0.931 | 0.12 deg | 0.260 | 0.220 |
+| Physics-informed (lambda=10) | 0.984 | 2.57 mV/pu | 0.927 | — | 0.125 | 0.118 |
 
 ![](figures/training_curve.png)
 
@@ -82,10 +82,10 @@ physics-consistency, and cross-topology transfer, developed below.
 
 Fine-tuning with the power-balance residual at `lambda=10` roughly halves the AC
 power-balance violation at negligible accuracy cost. Active-power mismatch `|dP|` drops
-from 0.254 to 0.107 MW (about 58% lower) and reactive `|dQ|` from 0.235 to 0.110 MVAr
-(about 53% lower), while voltage R2 moves 0.984 -> 0.983 (MAE 2.44 -> 2.61 mV/pu) and
-angle R2 0.930 -> 0.927. The predictions become more physically self-consistent without
-meaningfully sacrificing agreement with NR.
+from 0.252 to 0.125 MW (about 50% lower) and reactive `|dQ|` from 0.216 to 0.118 MVAr
+(about 46% lower), while voltage R2 stays at 0.984 (MAE 2.41 -> 2.57 mV/pu) and
+angle R2 moves 0.930 -> 0.927. The predictions become more physically self-consistent
+without meaningfully sacrificing agreement with NR.
 
 ![](figures/physics_before_after.png)
 
@@ -96,18 +96,18 @@ on the single base topology (held-out voltage MAE, mV/pu):
 
 | K | edge weights ON | edge weights OFF |
 |---|---:|---:|
-| 1 | 4.52 | 4.53 |
-| 2 | 3.28 | 3.28 |
-| 3 | 2.46 | 2.31 |
-| 4 | 1.98 | 1.46 |
+| 1 | 4.51 | 4.52 |
+| 2 | 3.27 | 3.26 |
+| 3 | 2.17 | 2.28 |
+| 4 | 1.98 | 1.77 |
 
 Hop count K dominates single-topology accuracy — going from K=1 to K=4 more than halves
 the MAE, consistent with voltage at a bus depending on injections several hops away along
 the feeder. The best single-topology configuration is K=4 with edge weights off, at
-1.46 mV/pu (R2 = 0.9916). On one fixed topology the impedance weights are close to neutral
-and slightly better off at high K: when the graph never changes, the network can absorb
-the fixed electrical structure into its learned weights without needing the explicit edge
-signal.
+1.77 mV/pu (R2 = 0.990). On one fixed topology the impedance weights are close to neutral
+— the better variant flips between K values: when the graph never changes, the network can
+absorb the fixed electrical structure into its learned weights without needing the explicit
+edge signal.
 
 ![](figures/ablation_k.png)
 
@@ -116,33 +116,38 @@ signal.
 Training a single model across 42 seen reconfigurations (6000 scenarios, 200 epochs) and
 evaluating on 17 held-out configurations tests whether the surrogate learns switching-
 invariant structure rather than memorizing one tree. The topology-general model reaches
-mean voltage MAE 12.20 mV/pu on seen configurations and 18.18 mV/pu on held-out ones; a
+mean voltage MAE 11.79 mV/pu on seen configurations and 17.82 mV/pu on held-out ones; a
 single-topology model evaluated on the same held-out configurations reaches only
-19.88 mV/pu. Training across reconfigurations transfers to unseen topologies
-(18.18 < 19.88). Absolute errors are larger than in the single-topology setting because
-the model must fit a whole family of feeders at once.
+20.43 mV/pu. Training across reconfigurations transfers to unseen topologies
+(17.82 < 20.43, about 13% lower error). Absolute errors are larger than in the
+single-topology setting because the model must fit a whole family of feeders at once.
 
 ### Phase 1 edge-weight topology ablation
 
 This is the ablation that reconciles the single-topology result above with the
-"topology-aware" claim. Two otherwise identical multi-topology models are trained, differing
-only in the impedance edge-weight switch (mean voltage MAE, mV/pu):
+"topology-aware" claim. For each of three seeds — each re-drawing the topology holdout
+split, the scenario data, and the initialization — two otherwise identical multi-topology
+models are trained, differing only in the impedance edge-weight switch (held-out voltage
+MAE and generalization gap, mV/pu):
 
-| Edge weights | Seen | Held-out | Generalization gap |
-|---|---:|---:|---:|
-| ON | 12.46 | 18.14 | +5.68 |
-| OFF | 11.15 | 18.79 | +7.64 |
+| Seed | Held-out ON | Held-out OFF | Gap ON | Gap OFF |
+|---|---:|---:|---:|---:|
+| 42 | 17.71 | 18.91 | 5.56 | 7.65 |
+| 43 | 20.38 | 21.23 | 8.84 | 9.99 |
+| 44 | 19.46 | 19.14 | 7.39 | 7.78 |
+| **mean ± std** | **19.18 ± 1.11** | **19.76 ± 1.05** | **7.26 ± 1.34** | **8.47 ± 1.08** |
 
-Turning the impedance weights on fits the seen topologies slightly *less* tightly (12.46
-vs 11.15) yet generalizes *better* to unseen ones (18.14 vs 18.79, about 3.4% lower error)
-and shrinks the generalization gap from 7.64 to 5.68. This resolves the tension with the
-single-topology ablation, where the weights looked neutral: the impedance weighting is an
-inductive bias whose value appears specifically when the topology changes. On a fixed graph
-the network can bake in the structure; when the graph is reconfigured, the explicit
-per-branch admittance tells the network how the new tree redistributes coupling, so it
-extrapolates rather than overfits the seen wiring. This is precisely what justifies calling
-the model topology-aware. The margin is modest (3.4%) and from a single seed, so it is
-reported as directional rather than definitive.
+The robust effect is the generalization gap: with the impedance weights on, the gap between
+seen- and held-out-topology error is smaller in **3 of 3 seeds** (mean 7.26 vs 8.47 mV/pu),
+while the weights fit the seen topologies slightly less tightly (11.92 vs 11.29 mV/pu).
+Held-out MAE itself favors the weights in 2 of 3 seeds (mean 19.18 vs 19.76, about 2.9%
+lower), a margin within run-to-run noise that should be read as directional. This resolves
+the tension with the single-topology ablation, where the weights looked neutral: the
+impedance weighting is an inductive bias whose value appears specifically when the topology
+changes. On a fixed graph the network can bake in the structure; when the graph is
+reconfigured, the explicit per-branch admittance consistently curbs overfitting to the seen
+wiring. That consistent regularization effect across seeds is what justifies calling the
+model topology-aware.
 
 ![](figures/ablation_edgeweights_topology.png)
 
@@ -150,9 +155,9 @@ reported as directional rather than definitive.
 
 Beyond acting as a standalone predictor, the surrogate can seed Newton-Raphson. Over 500
 scenarios on the base feeder, flat-start NR takes 3.26 iterations on average; initializing
-NR from the GNN prediction reduces this to 3.00 (8.0% fewer). The warm start is never worse
-than a flat start (100% of scenarios) and strictly faster in 26.2% of them; wall-clock
-falls from 22.6 to 19.2 ms (x1.18). Both starts converge to an identical solution
+NR from the GNN prediction reduces this to 2.99 (8.2% fewer). The warm start is never worse
+than a flat start (100% of scenarios) and strictly faster in 26.8% of them; wall-clock
+falls from 12.2 to 11.7 ms (x1.04). Both starts converge to an identical solution
 (max `|V|` discrepancy about 7e-9 pu), so the acceleration comes at no cost to correctness.
 
 The surrogate is thus a safe, measurable NR accelerator. Headroom is modest here because a
@@ -165,12 +170,13 @@ scale-free metric to read.
 
 ## Honest findings and limitations
 
-- **Single feeder, mostly single seed.** All results are on the 33-bus feeder, and the
-  topology and warm-start experiments use a single seed. Multi-seed error bars are needed
-  before treating small margins as settled.
-- **Modest margins where it matters most.** The edge-weight generalization benefit (3.4%)
-  and the warm-start iteration saving (8%) are real but small; they are reported as
-  directional evidence for the topology-aware inductive bias, not as large effects.
+- **Single feeder, few seeds.** All results are on the 33-bus feeder; the edge-weight
+  ablation spans three seeds, the remaining experiments one. Multi-seed error bars for
+  every experiment are needed before treating small margins as settled.
+- **Modest margins where it matters most.** The edge-weight held-out benefit (~2.9%,
+  within run-to-run noise; the gap reduction is the seed-consistent effect) and the
+  warm-start iteration saving (~8%) are real but small; they are reported as directional
+  evidence for the topology-aware inductive bias, not as large effects.
 - **A strong linear baseline.** LinDistFlow is very accurate on a single radial feeder, so
   the GNN's edge is differentiability, physics-consistency, and cross-topology transfer
   rather than raw single-feeder voltage accuracy.

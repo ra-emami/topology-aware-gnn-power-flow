@@ -1,15 +1,15 @@
 {
   "n_scenarios": 500,
   "iters_flat_mean": 3.262,
-  "iters_warm_mean": 3.0,
-  "iters_saved_mean": 0.262,
-  "iters_saved_pct": 8.03188228080932,
-  "frac_warm_faster": 0.262,
+  "iters_warm_mean": 2.994,
+  "iters_saved_mean": 0.268,
+  "iters_saved_pct": 8.215818516247701,
+  "frac_warm_faster": 0.268,
   "frac_warm_not_worse": 1.0,
-  "t_flat_ms_mean": 22.607480998383835,
-  "t_warm_ms_mean": 19.18018320389092,
-  "wallclock_speedup": 1.1786895233512498,
-  "max_solution_discrepancy_pu": 6.818720921231147e-09,
+  "t_flat_ms_mean": 12.207561917923158,
+  "t_warm_ms_mean": 11.744396401947597,
+  "wallclock_speedup": 1.0394371494390937,
+  "max_solution_discrepancy_pu": 7.257695777695972e-09,
   "fails": {
     "flat": 0,
     "warm": 0
